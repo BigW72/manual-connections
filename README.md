@@ -1,11 +1,11 @@
 # Manual PIA VPN Connections
 
-This repository contains documentation on how to create native WireGuard and OpenVPN connections to our __NextGen network__, and also on how to enable Port Forwarding in case you require this feature. You will find a lot of information below. However if you prefer quick test, here is the __TL/DR__:
+This repository contains documentation on how to create native WireGuard and OpenVPN connections, and also on how to enable Port Forwarding in case you require this feature. You will find a lot of information below. However if you prefer quick test, here is the __TL/DR__:
 
 ```
 git clone https://github.com/pia-foss/manual-connections.git
 cd manual-connections
-./run_setup.sh
+sudo ./run_setup.sh
 ```
 
 The scripts were written so that they are easy to read and to modify. The code also has a lot of comments, so that you find all the information you might need. We hope you will enjoy forking the repo and customizing the scripts for your setup!
@@ -19,6 +19,7 @@ The scripts were written so that they are easy to read and to modify. The code a
 - [PIA Port Forwarding](#pia-port-forwarding)
 - [Automated setup](#automated-setup)
 - [Manual PF testing](#manual-pf-testing)
+- [Thanks](#thanks)
 - [License](#license)
 
 ## Dependencies
@@ -37,7 +38,7 @@ In order for the scripts to work (probably even if you do a manual setup), you w
  * This repo is really fresh at this moment, so please take into consideration the fact that you will probably be one of the first users that use the scripts.
  * Though we support research of open source technologies, we can not provide official support for all FOSS platforms, as there are simply too many platforms (which is a good thing). That is why we link 3rd Party repos in this README. We can not guarantee the quality of the code in the 3rd Party Repos, so use them only if you understand the risks.
 
-## Confirmed distributions
+## Confirmed Distributions
 
 The functionality of the scripts within this repository has been tested and confirmed on the following operating systems and GNU/Linux distributions:
  * Arch
@@ -56,8 +57,10 @@ Some users have created their own repositories for manual connections, based on 
 | System | Fork | Language | Scope | Repository |
 |:-:|:-:|:-:|:-:|-|
 | FreeBSD | Yes | Bash | Compatibility | [glorious1/manual-connections](https://github.com/glorious1/manual-connections) |
+| Linux | No | Python | WireGuard, PF | [milahu/python-piavpn](https://github.com/milahu/python-piavpn) |
 | OPNsense | No | Python | WireGuard, PF | [FingerlessGlov3s/OPNsensePIAWireguard](https://github.com/FingerlessGlov3s/OPNsensePIAWireguard) |
 | pfSense | No | Sh | OpenVPN, PF | [fm407/PIA-NextGen-PortForwarding](https://github.com/fm407/PIA-NextGen-PortForwarding) |
+| pfSense | No | Java/PHP | WireGuard, PF | [ddb_db/pfpiamgr](https://gitlab.com/ddb_db/pfpiamgr) |
 | Synology | Yes | Bash | Compatibility | [steff2632/manual-connections](https://github.com/steff2632/manual-connections) |
 | Synology | No | Python | PF | [stmty9/synology](https://github.com/stmty9/synology) |
 | TrueNAS | No | Bash | PF | [dak180/TrueNAS-Scripts](https://github.com/dak180/TrueNAS-Scripts/blob/master/pia-port-forward.sh) |
@@ -69,17 +72,33 @@ The PIA Port Forwarding service (a.k.a. PF) allows you run services on your own 
 
 This service can be used only AFTER establishing a VPN connection.
 
-## Automated setup
+## Automated Setup
 
 In order to help you use VPN services and PF on any device, we have prepared a few bash scripts that should help you through the process of setting everything up. The scripts also contain a lot of comments, just in case you require detailed information regarding how the technology works. The functionality is controlled via environment variables, so that you have an easy time automating your setup.
 
+The easiest way to trigger a fully automated connection is by running this oneliner:
+```
+sudo VPN_PROTOCOL=wireguard DISABLE_IPV6="no" AUTOCONNECT=true PIA_PF=false PIA_USER=p0123456 PIA_PASS=xxxxxxxx ./run_setup.sh
+```
+
 Here is a list of scripts you could find useful:
- * [Get the best region and a token](get_region_and_token.sh): This script helps you to get the best region and also to get a token for VPN authentication. Adding your PIA credentials to env vars `PIA_USER` and `PIA_PASS` will allow the script to also get a VPN token. The script can also trigger the WireGuard script to create a connection, if you specify `PIA_AUTOCONNECT=wireguard` or `PIA_AUTOCONNECT=openvpn_udp_standard`
+ * [Prompt based connection](run_setup.sh): This script allows connections with a one-line call, or will prompt for any missing or invalid variables. Varaibles available for one-line calls include:
+   * `PIA_USER` - your PIA username
+   * `PIA_PASS` - your PIA password
+   * `PIA_DNS` - true/false
+   * `PIA_PF` - true/false
+   * `MAX_LATENCY` - numeric value, in seconds
+   * `AUTOCONNECT` - true/false; this will test for and select the server with the lowest latency, it will overried PREFERRED_REGION
+   * `PREFERRED_REGION` - the region ID for a PIA server
+   * `VPN_PROTOCOL` - wireguard or openvpn; openvpn will default to openvpn_udp_standard, but can also specify openvpn_tcp/udp_standad/strong
+   * `DISABLE_IPV6` - yes/no
+ * [Get region details](get_region.sh): This script will provide server details, validate `PREFERRED_REGION` input, and can determine the lowest latency location. The script can also trigger VPN connections, if you specify `VPN_PROTOCOL=wireguard` or `VPN_PROTOCOL=openvpn`; doing so requires a token. This script can reference `get_token.sh` with use of `PIA_USER` and `PIA_PASS`. If called without specifying `PREFERRED_REGION` this script writes a list of servers within lower than `MAX_LATENCY` to a `/opt/piavpn-manual/latencyList` for reference.
+ * [Get a token](get_token.sh): This script allows you to get an authentication token with a valid 'PIA_USER' and 'PIA_PASS'. It will write the token and its expiration date to `/opt/piavpn-manual/token` for reference.
  * [Connect to WireGuard](connect_to_wireguard_with_token.sh): This script allows you to connect to the VPN server via WireGuard.
  * [Connect to OpenVPN](connect_to_openvpn_with_token.sh): This script allows you to connect to the VPN server via OpenVPN.
  * [Enable Port Forwarding](port_forwarding.sh): Enables you to add Port Forwarding to an existing VPN connection. Adding the environment variable `PIA_PF=true` to any of the previous scripts will also trigger this script.
 
-## Manual PF tesing
+## Manual PF Testing
 
 To use port forwarding on the NextGen network, first of all establish a connection with your favorite protocol. After this, you will need to find the private IP of the gateway you are connected to. In case you are WireGuard, the gateway will be part of the JSON response you get from the server, as you can see in the [bash script](https://github.com/pia-foss/manual-connections/blob/master/wireguard_and_pf.sh#L119). In case you are using OpenVPN, you can find the gateway by checking the routing table with `ip route s t all`.
 
@@ -118,7 +137,7 @@ bash-5.0#
 
 Call __/bindPort__ every 15 minutes, or the port will be deleted!
 
-### Testing your new PF
+### Testing Your New PF
 
 To test that it works, you can tcpdump on the port you received:
 
@@ -141,6 +160,10 @@ listening on any, link-type LINUX_SLL (Linux cooked v1), capture size 262144 byt
 ```
 
 If you run curl on the same machine (the one that is connected to the VPN), you will see the traffic in tcpdump anyway and the test won't prove anything. At the same time, the request will get firewall so you will not be able to access the port from the same machine. This can only be tested properly by running curl on another system.
+
+## Thanks
+
+A big special thanks to [faireOwl](https://github.com/faireOwl) for his contributions to this repo.
 
 ## License
 This project is licensed under the [MIT (Expat) license](https://choosealicense.com/licenses/mit/), which can be found [here](/LICENSE).
