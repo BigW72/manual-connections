@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright (C) 2020 Private Internet Access, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,76 +20,73 @@
 # SOFTWARE.
 
 # This function allows you to check if the required tools have been installed.
-function check_tool() {
+check_tool() {
   cmd=$1
-  if ! command -v $cmd &>/dev/null
-  then
+  if ! command -v "$cmd" >/dev/null; then
     echo "$cmd could not be found"
     echo "Please install $cmd"
     exit 1
   fi
 }
-
-# This function creates a timestamp, to use for setting $TOKEN_EXPIRATION
-function timeout_timestamp() {
-  date +"%c" --date='1 day' # Timestamp 24 hours
-}
-
 # Now we call the function to make sure we can use curl and jq.
 check_tool curl
 check_tool jq
 
+# This function creates a timestamp, to use for setting $TOKEN_EXPIRATION
+timeout_timestamp() {
+  date +"%c" --date='1 day' # Timestamp 24 hours
+}
+
 # Check if terminal allows output, if yes, define colors for output
-if test -t 1; then
+if [[ -t 1 ]]; then
   ncolors=$(tput colors)
-  if test -n "$ncolors" && test $ncolors -ge 8; then
-    GREEN='\033[0;32m'
-    RED='\033[0;31m'
-    NC='\033[0m' # No Color
+  if [[ -n $ncolors && $ncolors -ge 8 ]]; then
+    red=$(tput setaf 1) # ANSI red
+    green=$(tput setaf 2) # ANSI green
+    nc=$(tput sgr0) # No Color
   else
-    GREEN=''
-    RED=''
-    NC='' # No Color
+    red=''
+    green=''
+    nc='' # No Color
   fi
 fi
 
-# Only allow script to run as
-if [ "$(whoami)" != "root" ]; then
-  echo -e "${RED}This script needs to be run as root. Try again with 'sudo $0'${NC}"
+# Only allow script to run as root
+if (( EUID != 0 )); then
+  echo -e "${red}This script needs to be run as root. Try again with 'sudo $0'${nc}"
   exit 1
 fi
 
 mkdir -p /opt/piavpn-manual
 
-if [[ ! $PIA_USER || ! $PIA_PASS ]]; then
-  echo If you want this script to automatically get a token from the Meta
-  echo service, please add the variables PIA_USER and PIA_PASS. Example:
-  echo $ PIA_USER=p0123456 PIA_PASS=xxx ./get_token.sh
+if [[ -z $PIA_USER || -z $PIA_PASS ]]; then
+  echo "If you want this script to automatically get a token from the Meta"
+  echo "service, please add the variables PIA_USER and PIA_PASS. Example:"
+  echo "$ PIA_USER=p0123456 PIA_PASS=xxx ./get_token.sh"
   exit 1
 fi
-
-tokenLocation=/opt/piavpn-manual/token
 
 echo -n "Checking login credentials..."
 
 generateTokenResponse=$(curl -s -u "$PIA_USER:$PIA_PASS" \
-  "https://privateinternetaccess.com/gtoken/generateToken")
+  "https://www.privateinternetaccess.com/gtoken/generateToken")
 
-if [ "$(echo "$generateTokenResponse" | jq -r '.status')" != "OK" ]; then
+if [[ $(echo "$generateTokenResponse" | jq -r '.status') != "OK" ]]; then
   echo
   echo
-  echo -e "${RED}Could not authenticate with the login credentials provided!${NC}"
+  echo -e "${red}Could not authenticate with the login credentials provided!${nc}"
   echo
   exit
 fi
-  
-echo -e ${GREEN}OK!
+
+echo -e "${green}OK!"
 echo
 token=$(echo "$generateTokenResponse" | jq -r '.token')
 tokenExpiration=$(timeout_timestamp)
-echo -e PIA_TOKEN=$token${NC}
-echo $token > /opt/piavpn-manual/token || exit 1
-echo $tokenExpiration >> /opt/piavpn-manual/token
-echo 
-echo This token will expire in 24 hours, on $tokenExpiration.
+tokenLocation="/opt/piavpn-manual/token"
+echo -e "PIA_TOKEN=$token${nc}"
+echo "$token" > "$tokenLocation" || exit 1
+echo "$tokenExpiration" >> "$tokenLocation"
+echo
+echo "This token will expire in 24 hours, on $tokenExpiration."
 echo
